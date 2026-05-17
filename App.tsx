@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
+  Linking,
   Pressable,
   RefreshControl,
   SafeAreaView,
@@ -12,6 +13,7 @@ import {
   View,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
+import { Ionicons } from "@expo/vector-icons";
 import {
   fetchEpisodes,
   fetchPages,
@@ -179,18 +181,36 @@ export default function App() {
                 scrollEnabled={false}
                 ItemSeparatorComponent={() => <View style={styles.rowGap} />}
                 renderItem={({ item }) => (
-                  <Pressable
-                    style={({ pressed }) => [
-                      styles.row,
-                      pressed && styles.rowPressed,
-                    ]}
-                    onPress={() =>
-                      setView({ kind: "episode", episode: item })
-                    }
-                  >
-                    <Text style={styles.rowText}>{item.title}</Text>
-                    <Text style={styles.rowMeta}>{formatDate(item.createdAt)}</Text>
-                  </Pressable>
+                  <View style={styles.row}>
+                    <Pressable
+                      style={({ pressed }) => [
+                        styles.rowMain,
+                        pressed && styles.rowPressed,
+                      ]}
+                      onPress={() =>
+                        setView({ kind: "episode", episode: item })
+                      }
+                    >
+                      <Text style={styles.rowText} numberOfLines={1}>
+                        {item.title}
+                      </Text>
+                      <Text style={styles.rowMeta}>
+                        {formatDate(item.createdAt)}
+                      </Text>
+                    </Pressable>
+                    <Pressable
+                      onPress={() => Linking.openURL(notionUrl(item.pageId))}
+                      hitSlop={8}
+                      style={({ pressed }) => [
+                        styles.notionLink,
+                        pressed && styles.notionLinkPressed,
+                      ]}
+                      accessibilityLabel="Open in Notion"
+                    >
+                      <Ionicons name="open-outline" size={14} color="#6366f1" />
+                      <Text style={styles.notionLinkText}>Notion</Text>
+                    </Pressable>
+                  </View>
                 )}
               />
             )}
@@ -273,6 +293,10 @@ export default function App() {
       )}
     </SafeAreaView>
   );
+}
+
+function notionUrl(pageId: string): string {
+  return `https://www.notion.so/${pageId.replace(/-/g, "")}`;
 }
 
 function formatDate(iso: string): string {
@@ -365,11 +389,16 @@ const styles = StyleSheet.create({
   },
   row: {
     backgroundColor: "white",
-    paddingVertical: 14,
-    paddingHorizontal: 16,
     borderRadius: 10,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: "#e2e8f0",
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  rowMain: {
+    flex: 1,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
   },
   rowPressed: {
     opacity: 0.7,
@@ -382,6 +411,24 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#94a3b8",
     marginTop: 2,
+  },
+  notionLink: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    marginRight: 10,
+    borderRadius: 999,
+    backgroundColor: "#eef2ff",
+  },
+  notionLinkPressed: {
+    opacity: 0.6,
+  },
+  notionLinkText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#6366f1",
   },
   error: {
     color: "#b91c1c",
