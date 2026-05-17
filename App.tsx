@@ -20,6 +20,7 @@ import {
   type PageSummary,
 } from "./src/api";
 import { PodcastPlayer } from "./src/components/PodcastPlayer";
+import { SyncedScript } from "./src/components/SyncedScript";
 
 type View_ =
   | { kind: "home" }
@@ -41,6 +42,9 @@ export default function App() {
 
   const [refreshing, setRefreshing] = useState(false);
   const [urlInput, setUrlInput] = useState("");
+
+  const [positionMs, setPositionMs] = useState(0);
+  const [durationMs, setDurationMs] = useState(0);
 
   const loadPages = useCallback(async () => {
     setPagesError(null);
@@ -102,6 +106,8 @@ export default function App() {
   function back() {
     setView({ kind: "home" });
     setGenError(null);
+    setPositionMs(0);
+    setDurationMs(0);
   }
 
   return (
@@ -250,9 +256,19 @@ export default function App() {
           <Text style={styles.mutedText}>
             {formatDate(view.episode.createdAt)}
           </Text>
-          <PodcastPlayer audioUrl={view.episode.audioUrl} />
+          <PodcastPlayer
+            audioUrl={view.episode.audioUrl}
+            onProgress={(pos, dur) => {
+              setPositionMs(pos);
+              if (dur) setDurationMs(dur);
+            }}
+          />
           <Text style={styles.scriptHeading}>Script</Text>
-          <Text style={styles.scriptBody}>{view.episode.script}</Text>
+          <SyncedScript
+            script={view.episode.script}
+            positionMs={positionMs}
+            durationMs={durationMs}
+          />
         </ScrollView>
       )}
     </SafeAreaView>
