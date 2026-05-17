@@ -1,0 +1,23 @@
+node_modules/
+.expo/
+dist/
+web-build/
+.vercel/
+
+# Native
+ios/
+android/
+
+# Env
+.env
+.env.local
+.env*.local
+
+# Logs
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+
+# macOS
+.DS_Store
+.vercel

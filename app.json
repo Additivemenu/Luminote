@@ -1,0 +1,19 @@
+{
+  "expo": {
+    "name": "Luminote",
+    "slug": "luminote",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.luminote.app"
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single"
+    },
+    "plugins": ["expo-av"]
+  }
+}

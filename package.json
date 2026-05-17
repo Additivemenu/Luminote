@@ -1,0 +1,36 @@
+{
+  "name": "luminote",
+  "version": "0.1.0",
+  "private": true,
+  "main": "expo/AppEntry.js",
+  "scripts": {
+    "dev:api": "dotenv -e .env.local -- vercel dev --listen 0.0.0.0:3000",
+    "dev:web": "expo start --web",
+    "dev:ios": "expo start --ios",
+    "start": "expo start",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@expo/metro-runtime": "~3.2.1",
+    "@notionhq/client": "^2.2.15",
+    "expo": "~51.0.28",
+    "expo-av": "~14.0.7",
+    "expo-constants": "~16.0.2",
+    "expo-file-system": "~17.0.1",
+    "expo-status-bar": "~1.12.1",
+    "openai": "^4.56.0",
+    "react": "18.2.0",
+    "react-dom": "18.2.0",
+    "react-native": "0.74.5",
+    "react-native-web": "~0.19.10"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.24.0",
+    "@types/node": "^20.14.0",
+    "@types/react": "~18.2.79",
+    "@vercel/node": "^3.2.0",
+    "dotenv-cli": "^11.0.0",
+    "typescript": "~5.3.3",
+    "vercel": "^54.1.0"
+  }
+}
