@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { StyleSheet, Text, View } from "react-native";
+import { Theme, useTheme } from "../theme";
 
 interface Props {
   script: string;
@@ -25,6 +26,9 @@ function splitSentences(text: string): string[] {
 }
 
 export function SyncedScript({ script, positionMs, durationMs }: Props) {
+  const theme = useTheme();
+  const styles = useStyles(theme);
+
   const { sentences, cumulative, total } = useMemo(() => {
     const sentences = splitSentences(script);
     const cumulative: number[] = [];
@@ -65,19 +69,26 @@ export function SyncedScript({ script, positionMs, durationMs }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
-  body: {
-    fontSize: 16,
-    lineHeight: 26,
-  },
-  past: {
-    color: "#94a3b8",
-  },
-  active: {
-    color: "#6366f1",
-    fontWeight: "700",
-  },
-  upcoming: {
-    color: "#334155",
-  },
-});
+function useStyles(theme: Theme) {
+  return useMemo(
+    () =>
+      StyleSheet.create({
+        body: {
+          fontSize: 16,
+          lineHeight: 26,
+          color: theme.text,
+        },
+        past: {
+          color: theme.textDim,
+        },
+        active: {
+          color: theme.highlight,
+          fontWeight: "700",
+        },
+        upcoming: {
+          color: theme.textMuted,
+        },
+      }),
+    [theme],
+  );
+}
