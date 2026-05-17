@@ -25,6 +25,7 @@ import {
 } from "./src/api";
 import { PodcastPlayer } from "./src/components/PodcastPlayer";
 import { SyncedScript } from "./src/components/SyncedScript";
+import { VoicePicker } from "./src/components/VoicePicker";
 import { Theme, useTheme } from "./src/theme";
 
 type View_ =
@@ -50,6 +51,7 @@ export default function App() {
 
   const [refreshing, setRefreshing] = useState(false);
   const [urlInput, setUrlInput] = useState("");
+  const [selectedVoice, setSelectedVoice] = useState<string>("nova");
 
   const [positionMs, setPositionMs] = useState(0);
   const [durationMs, setDurationMs] = useState(0);
@@ -107,7 +109,7 @@ export default function App() {
     setGenError(null);
     setView({ kind: "generating", title });
     try {
-      const ep = await generatePodcast(input);
+      const ep = await generatePodcast(input, selectedVoice);
       setEpisodes((prev) => [ep, ...prev.filter((e) => e.id !== ep.id)]);
       setView({ kind: "episode", episode: ep });
     } catch (err) {
@@ -170,6 +172,10 @@ export default function App() {
                 returnKeyType="go"
                 onSubmitEditing={generateFromUrl}
               />
+              <VoicePicker
+                value={selectedVoice}
+                onChange={setSelectedVoice}
+              />
               <Pressable
                 style={({ pressed }) => [
                   styles.primaryButton,
@@ -221,7 +227,8 @@ export default function App() {
                             {item.title}
                           </Text>
                           <Text style={styles.rowMeta}>
-                            {formatDate(item.createdAt)}
+                            {formatDate(item.createdAt)} ·{" "}
+                            {capitalize(item.voice)}
                           </Text>
                         </Pressable>
                         <Pressable
@@ -370,6 +377,10 @@ function FadeInRow({
 
 function notionUrl(pageId: string): string {
   return `https://www.notion.so/${pageId.replace(/-/g, "")}`;
+}
+
+function capitalize(s: string): string {
+  return s.length === 0 ? s : s[0].toUpperCase() + s.slice(1);
 }
 
 function formatDate(iso: string): string {

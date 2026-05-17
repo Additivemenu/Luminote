@@ -24,4 +24,5 @@ yarn-error.*
 
 # Generated podcast episodes (local-only storage)
 /public/episodes/
+/public/voices/
 /data/

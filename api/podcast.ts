@@ -1,6 +1,11 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { extractPageId, getPageText, getPageTitle } from "../lib/notion";
-import { generateScript, synthesizeSpeech } from "../lib/openai";
+import {
+  DEFAULT_VOICE,
+  generateScript,
+  isVoice,
+  synthesizeSpeech,
+} from "../lib/openai";
 import { saveEpisode } from "../lib/storage";
 import { applyCors } from "./_cors";
 
@@ -15,15 +20,17 @@ export default async function handler(
     return;
   }
 
-  const rawInput =
-    typeof req.body === "object" && req.body !== null
-      ? (req.body as { pageId?: unknown }).pageId
-      : undefined;
+  const body =
+    typeof req.body === "object" && req.body !== null ? req.body : {};
+  const rawInput = (body as { pageId?: unknown }).pageId;
+  const rawVoice = (body as { voice?: unknown }).voice;
 
   if (typeof rawInput !== "string" || rawInput.length === 0) {
     res.status(400).json({ error: "Missing 'pageId' in request body" });
     return;
   }
+
+  const voice = isVoice(rawVoice) ? rawVoice : DEFAULT_VOICE;
 
   let pageId: string;
   try {
@@ -47,9 +54,15 @@ export default async function handler(
     }
 
     const script = await generateScript(rawText);
-    const audio = await synthesizeSpeech(script);
+    const audio = await synthesizeSpeech(script, voice);
 
-    const episode = await saveEpisode({ pageId, title, script, audio });
+    const episode = await saveEpisode({
+      pageId,
+      title,
+      script,
+      audio,
+      voice,
+    });
     res.status(200).json({ episode });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";

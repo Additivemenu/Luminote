@@ -11,6 +11,7 @@ export interface Episode {
   title: string;
   script: string;
   audioPath: string;
+  voice: string;
   createdAt: string;
 }
 
@@ -31,7 +32,9 @@ async function writeIndex(all: Episode[]): Promise<void> {
 
 export async function listEpisodes(): Promise<Episode[]> {
   const all = await readIndex();
-  return [...all].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  // Backfill voice on old episodes that pre-date the field.
+  const normalized = all.map((e) => ({ ...e, voice: e.voice ?? "nova" }));
+  return normalized.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
 export async function saveEpisode(input: {
@@ -39,6 +42,7 @@ export async function saveEpisode(input: {
   title: string;
   script: string;
   audio: Buffer;
+  voice: string;
 }): Promise<Episode> {
   const createdAt = new Date().toISOString();
   const id = `${input.pageId}-${Date.now()}`;
@@ -53,6 +57,7 @@ export async function saveEpisode(input: {
     title: input.title,
     script: input.script,
     audioPath: `/episodes/${filename}`,
+    voice: input.voice,
     createdAt,
   };
 

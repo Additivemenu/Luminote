@@ -21,6 +21,7 @@ export interface Episode {
   title: string;
   script: string;
   audioUrl: string;
+  voice: string;
   createdAt: string;
 }
 
@@ -35,6 +36,7 @@ interface EpisodeWire {
   title: string;
   script: string;
   audioPath: string;
+  voice?: string;
   createdAt: string;
 }
 
@@ -45,6 +47,7 @@ function hydrateEpisode(e: EpisodeWire): Episode {
     title: e.title,
     script: e.script,
     audioUrl: `${getBaseUrl()}${e.audioPath}`,
+    voice: e.voice ?? "nova",
     createdAt: e.createdAt,
   };
 }
@@ -64,11 +67,14 @@ export async function fetchPages(): Promise<PagesResponse> {
   return (await res.json()) as PagesResponse;
 }
 
-export async function generatePodcast(pageId: string): Promise<Episode> {
+export async function generatePodcast(
+  pageId: string,
+  voice?: string,
+): Promise<Episode> {
   const res = await fetch(`${getBaseUrl()}/api/podcast`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ pageId }),
+    body: JSON.stringify({ pageId, voice }),
   });
   if (!res.ok) throw new Error(await readError(res));
   const body = (await res.json()) as { episode: EpisodeWire };
@@ -80,4 +86,15 @@ export async function fetchEpisodes(): Promise<Episode[]> {
   if (!res.ok) throw new Error(await readError(res));
   const body = (await res.json()) as { episodes: EpisodeWire[] };
   return body.episodes.map(hydrateEpisode);
+}
+
+export async function fetchVoicePreview(voice: string): Promise<string> {
+  const res = await fetch(`${getBaseUrl()}/api/voice-preview`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ voice }),
+  });
+  if (!res.ok) throw new Error(await readError(res));
+  const body = (await res.json()) as { audioPath: string };
+  return `${getBaseUrl()}${body.audioPath}`;
 }
