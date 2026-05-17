@@ -1,6 +1,7 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { extractPageId, getPageText } from "../lib/notion";
+import { extractPageId, getPageText, getPageTitle } from "../lib/notion";
 import { generateScript, synthesizeSpeech } from "../lib/openai";
+import { saveEpisode } from "../lib/storage";
 import { applyCors } from "./_cors";
 
 export default async function handler(
@@ -35,7 +36,11 @@ export default async function handler(
   }
 
   try {
-    const rawText = await getPageText(pageId);
+    const [rawText, title] = await Promise.all([
+      getPageText(pageId),
+      getPageTitle(pageId),
+    ]);
+
     if (rawText.trim().length === 0) {
       res.status(422).json({ error: "Notion page has no readable text" });
       return;
@@ -44,11 +49,8 @@ export default async function handler(
     const script = await generateScript(rawText);
     const audio = await synthesizeSpeech(script);
 
-    res.status(200).json({
-      script,
-      audioBase64: audio.toString("base64"),
-      mimeType: "audio/mpeg",
-    });
+    const episode = await saveEpisode({ pageId, title, script, audio });
+    res.status(200).json({ episode });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     console.error("[/api/podcast]", err);

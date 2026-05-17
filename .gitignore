@@ -21,3 +21,7 @@ yarn-error.*
 # macOS
 .DS_Store
 .vercel
+
+# Generated podcast episodes (local-only storage)
+/public/episodes/
+/data/

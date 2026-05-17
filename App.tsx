@@ -13,35 +13,36 @@ import {
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import {
+  fetchEpisodes,
   fetchPages,
   generatePodcast,
+  type Episode,
   type PageSummary,
-  type PodcastResult,
 } from "./src/api";
 import { PodcastPlayer } from "./src/components/PodcastPlayer";
 
-interface Selection {
-  title: string;
-  source: string;
-}
+type View_ =
+  | { kind: "home" }
+  | { kind: "generating"; title: string }
+  | { kind: "episode"; episode: Episode };
 
 export default function App() {
+  const [view, setView] = useState<View_>({ kind: "home" });
+  const [genError, setGenError] = useState<string | null>(null);
+
   const [pages, setPages] = useState<PageSummary[]>([]);
   const [hasDatabase, setHasDatabase] = useState(false);
   const [pagesError, setPagesError] = useState<string | null>(null);
   const [loadingPages, setLoadingPages] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
 
+  const [episodes, setEpisodes] = useState<Episode[]>([]);
+  const [loadingEpisodes, setLoadingEpisodes] = useState(true);
+  const [episodesError, setEpisodesError] = useState<string | null>(null);
+
+  const [refreshing, setRefreshing] = useState(false);
   const [urlInput, setUrlInput] = useState("");
 
-  const [selected, setSelected] = useState<Selection | null>(null);
-  const [generating, setGenerating] = useState(false);
-  const [genError, setGenError] = useState<string | null>(null);
-  const [result, setResult] = useState<PodcastResult | null>(null);
-
-  const loadPages = useCallback(async (mode: "initial" | "refresh") => {
-    if (mode === "initial") setLoadingPages(true);
-    else setRefreshing(true);
+  const loadPages = useCallback(async () => {
     setPagesError(null);
     try {
       const { pages: next, hasDatabase: hasDb } = await fetchPages();
@@ -51,40 +52,56 @@ export default function App() {
       setPagesError(err instanceof Error ? err.message : "Failed to load pages");
     } finally {
       setLoadingPages(false);
-      setRefreshing(false);
     }
   }, []);
 
-  useEffect(() => {
-    loadPages("initial");
-  }, [loadPages]);
-
-  async function generate(selection: Selection) {
-    setSelected(selection);
-    setResult(null);
-    setGenError(null);
-    setGenerating(true);
+  const loadEpisodes = useCallback(async () => {
+    setEpisodesError(null);
     try {
-      const next = await generatePodcast(selection.source);
-      setResult(next);
+      setEpisodes(await fetchEpisodes());
     } catch (err) {
-      setGenError(err instanceof Error ? err.message : "Failed to generate podcast");
+      setEpisodesError(
+        err instanceof Error ? err.message : "Failed to load library",
+      );
     } finally {
-      setGenerating(false);
+      setLoadingEpisodes(false);
+    }
+  }, []);
+
+  const refresh = useCallback(async () => {
+    setRefreshing(true);
+    await Promise.all([loadPages(), loadEpisodes()]);
+    setRefreshing(false);
+  }, [loadPages, loadEpisodes]);
+
+  useEffect(() => {
+    loadPages();
+    loadEpisodes();
+  }, [loadPages, loadEpisodes]);
+
+  async function generate(input: string, title: string) {
+    setGenError(null);
+    setView({ kind: "generating", title });
+    try {
+      const ep = await generatePodcast(input);
+      setEpisodes((prev) => [ep, ...prev.filter((e) => e.id !== ep.id)]);
+      setView({ kind: "episode", episode: ep });
+    } catch (err) {
+      setGenError(err instanceof Error ? err.message : "Failed to generate");
+      setView({ kind: "home" });
     }
   }
 
   function generateFromUrl() {
     const trimmed = urlInput.trim();
     if (!trimmed) return;
-    generate({ title: "Pasted Notion page", source: trimmed });
+    setUrlInput("");
+    generate(trimmed, "Pasted Notion page");
   }
 
   function back() {
-    setSelected(null);
-    setResult(null);
+    setView({ kind: "home" });
     setGenError(null);
-    setGenerating(false);
   }
 
   return (
@@ -95,17 +112,18 @@ export default function App() {
         <Text style={styles.subtitle}>Notion notes → podcast</Text>
       </View>
 
-      {!selected ? (
+      {view.kind === "home" ? (
         <ScrollView
           contentContainerStyle={styles.scroll}
           refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={() => loadPages("refresh")}
-            />
+            <RefreshControl refreshing={refreshing} onRefresh={refresh} />
           }
         >
-          <View style={styles.urlSection}>
+          {genError && (
+            <Text style={[styles.error, { marginBottom: 12 }]}>{genError}</Text>
+          )}
+
+          <View style={styles.section}>
             <Text style={styles.sectionLabel}>Paste a Notion page link</Text>
             <TextInput
               style={styles.input}
@@ -131,40 +149,27 @@ export default function App() {
               <Text style={styles.primaryButtonText}>Generate podcast</Text>
             </Pressable>
             <Text style={styles.hint}>
-              Make sure your Notion integration has access to the page (open the
-              page → ··· → Connections → add your integration).
+              Add your Notion integration to the page first: open the page → ···
+              → Connections → add your integration.
             </Text>
           </View>
 
           <View style={styles.divider} />
 
-          <View style={styles.dbSection}>
-            <Text style={styles.sectionLabel}>From your database</Text>
-            {loadingPages ? (
+          <View style={styles.section}>
+            <Text style={styles.sectionLabel}>Library</Text>
+            {loadingEpisodes ? (
               <ActivityIndicator />
-            ) : pagesError ? (
-              <View>
-                <Text style={styles.error}>{pagesError}</Text>
-                <Pressable
-                  style={styles.retry}
-                  onPress={() => loadPages("initial")}
-                >
-                  <Text style={styles.retryText}>Retry</Text>
-                </Pressable>
-              </View>
-            ) : !hasDatabase ? (
-              <Text style={styles.dbStatus}>
-                No NOTION_DATABASE_ID configured. Use the link input above, or
-                set the env var to browse a database.
-              </Text>
-            ) : pages.length === 0 ? (
-              <Text style={styles.dbStatus}>
-                Database is empty. Pull to refresh.
+            ) : episodesError ? (
+              <Text style={styles.error}>{episodesError}</Text>
+            ) : episodes.length === 0 ? (
+              <Text style={styles.mutedText}>
+                No episodes yet. Generate one above.
               </Text>
             ) : (
               <FlatList
-                data={pages}
-                keyExtractor={(p) => p.id}
+                data={episodes}
+                keyExtractor={(e) => e.id}
                 scrollEnabled={false}
                 ItemSeparatorComponent={() => <View style={styles.rowGap} />}
                 renderItem={({ item }) => (
@@ -174,51 +179,92 @@ export default function App() {
                       pressed && styles.rowPressed,
                     ]}
                     onPress={() =>
-                      generate({ title: item.title, source: item.id })
+                      setView({ kind: "episode", episode: item })
                     }
                   >
                     <Text style={styles.rowText}>{item.title}</Text>
+                    <Text style={styles.rowMeta}>{formatDate(item.createdAt)}</Text>
                   </Pressable>
                 )}
               />
             )}
           </View>
+
+          {hasDatabase && (
+            <>
+              <View style={styles.divider} />
+              <View style={styles.section}>
+                <Text style={styles.sectionLabel}>From your database</Text>
+                {loadingPages ? (
+                  <ActivityIndicator />
+                ) : pagesError ? (
+                  <Text style={styles.error}>{pagesError}</Text>
+                ) : pages.length === 0 ? (
+                  <Text style={styles.mutedText}>
+                    Database is empty. Pull to refresh.
+                  </Text>
+                ) : (
+                  <FlatList
+                    data={pages}
+                    keyExtractor={(p) => p.id}
+                    scrollEnabled={false}
+                    ItemSeparatorComponent={() => (
+                      <View style={styles.rowGap} />
+                    )}
+                    renderItem={({ item }) => (
+                      <Pressable
+                        style={({ pressed }) => [
+                          styles.row,
+                          pressed && styles.rowPressed,
+                        ]}
+                        onPress={() => generate(item.id, item.title)}
+                      >
+                        <Text style={styles.rowText}>{item.title}</Text>
+                      </Pressable>
+                    )}
+                  />
+                )}
+              </View>
+            </>
+          )}
         </ScrollView>
+      ) : view.kind === "generating" ? (
+        <View style={styles.detail}>
+          <Pressable onPress={back} style={styles.backButton}>
+            <Text style={styles.backText}>← Back</Text>
+          </Pressable>
+          <Text style={styles.detailTitle}>{view.title}</Text>
+          <View style={styles.generatingBlock}>
+            <ActivityIndicator />
+            <Text style={styles.mutedText}>
+              Generating script + audio… (~20–40s)
+            </Text>
+          </View>
+        </View>
       ) : (
         <ScrollView contentContainerStyle={styles.detail}>
           <Pressable onPress={back} style={styles.backButton}>
             <Text style={styles.backText}>← Back</Text>
           </Pressable>
-          <Text style={styles.detailTitle}>{selected.title}</Text>
-
-          {generating ? (
-            <View style={styles.generatingBlock}>
-              <ActivityIndicator />
-              <Text style={styles.generatingText}>
-                Generating script + audio… (~20–40s)
-              </Text>
-            </View>
-          ) : genError ? (
-            <View>
-              <Text style={styles.error}>{genError}</Text>
-              <Pressable style={styles.retry} onPress={() => generate(selected)}>
-                <Text style={styles.retryText}>Try again</Text>
-              </Pressable>
-            </View>
-          ) : result ? (
-            <>
-              <PodcastPlayer
-                audioBase64={result.audioBase64}
-                mimeType={result.mimeType}
-              />
-              <Text style={styles.scriptHeading}>Script</Text>
-              <Text style={styles.scriptBody}>{result.script}</Text>
-            </>
-          ) : null}
+          <Text style={styles.detailTitle}>{view.episode.title}</Text>
+          <Text style={styles.mutedText}>
+            {formatDate(view.episode.createdAt)}
+          </Text>
+          <PodcastPlayer audioUrl={view.episode.audioUrl} />
+          <Text style={styles.scriptHeading}>Script</Text>
+          <Text style={styles.scriptBody}>{view.episode.script}</Text>
         </ScrollView>
       )}
     </SafeAreaView>
   );
+}
+
+function formatDate(iso: string): string {
+  try {
+    return new Date(iso).toLocaleString();
+  } catch {
+    return iso;
+  }
 }
 
 const styles = StyleSheet.create({
@@ -247,7 +293,7 @@ const styles = StyleSheet.create({
     padding: 20,
     paddingBottom: 32,
   },
-  urlSection: {
+  section: {
     gap: 10,
   },
   sectionLabel: {
@@ -294,10 +340,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#e2e8f0",
     marginVertical: 24,
   },
-  dbSection: {
-    gap: 12,
-  },
-  dbStatus: {
+  mutedText: {
     color: "#64748b",
     fontSize: 14,
   },
@@ -319,20 +362,13 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: "#0f172a",
   },
+  rowMeta: {
+    fontSize: 12,
+    color: "#94a3b8",
+    marginTop: 2,
+  },
   error: {
     color: "#b91c1c",
-    marginBottom: 12,
-  },
-  retry: {
-    alignSelf: "flex-start",
-    paddingVertical: 10,
-    paddingHorizontal: 18,
-    borderRadius: 999,
-    backgroundColor: "#0f172a",
-  },
-  retryText: {
-    color: "white",
-    fontWeight: "600",
   },
   detail: {
     padding: 20,
@@ -355,9 +391,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: 24,
     gap: 8,
-  },
-  generatingText: {
-    color: "#64748b",
   },
   scriptHeading: {
     marginTop: 16,

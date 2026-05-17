@@ -1,49 +1,21 @@
 import { useEffect, useRef, useState } from "react";
 import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { Audio, AVPlaybackStatus } from "expo-av";
-import * as FileSystem from "expo-file-system";
 
 interface Props {
-  audioBase64: string;
-  mimeType: string;
+  audioUrl: string;
 }
 
-async function makePlayableUri(
-  audioBase64: string,
-  mimeType: string,
-): Promise<{ uri: string; cleanup: () => void }> {
-  if (Platform.OS === "web") {
-    const byteString = atob(audioBase64);
-    const bytes = new Uint8Array(byteString.length);
-    for (let i = 0; i < byteString.length; i += 1) {
-      bytes[i] = byteString.charCodeAt(i);
-    }
-    const blob = new Blob([bytes], { type: mimeType });
-    const url = URL.createObjectURL(blob);
-    return { uri: url, cleanup: () => URL.revokeObjectURL(url) };
-  }
-
-  const path = `${FileSystem.cacheDirectory}episode-${Date.now()}.mp3`;
-  await FileSystem.writeAsStringAsync(path, audioBase64, {
-    encoding: FileSystem.EncodingType.Base64,
-  });
-  return {
-    uri: path,
-    cleanup: () => {
-      FileSystem.deleteAsync(path, { idempotent: true }).catch(() => {});
-    },
-  };
-}
-
-export function PodcastPlayer({ audioBase64, mimeType }: Props) {
+export function PodcastPlayer({ audioUrl }: Props) {
   const soundRef = useRef<Audio.Sound | null>(null);
-  const cleanupRef = useRef<(() => void) | null>(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isReady, setIsReady] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
+    setIsReady(false);
+    setError(null);
 
     (async () => {
       try {
@@ -55,21 +27,14 @@ export function PodcastPlayer({ audioBase64, mimeType }: Props) {
           });
         }
 
-        const { uri, cleanup } = await makePlayableUri(audioBase64, mimeType);
-        if (cancelled) {
-          cleanup();
-          return;
-        }
-        cleanupRef.current = cleanup;
-
         const { sound } = await Audio.Sound.createAsync(
-          { uri },
+          { uri: audioUrl },
           { shouldPlay: false },
           onPlaybackStatus,
         );
+
         if (cancelled) {
           await sound.unloadAsync();
-          cleanup();
           return;
         }
         soundRef.current = sound;
@@ -84,13 +49,10 @@ export function PodcastPlayer({ audioBase64, mimeType }: Props) {
     return () => {
       cancelled = true;
       const sound = soundRef.current;
-      const cleanup = cleanupRef.current;
       soundRef.current = null;
-      cleanupRef.current = null;
       if (sound) sound.unloadAsync().catch(() => {});
-      if (cleanup) cleanup();
     };
-  }, [audioBase64, mimeType]);
+  }, [audioUrl]);
 
   function onPlaybackStatus(status: AVPlaybackStatus) {
     if (!status.isLoaded) return;
